@@ -22,7 +22,8 @@ def load_nlp():
     try:
         return spacy.load("en_core_web_sm")
     except Exception:
-        return None
+        os.system("python -m spacy download en_core_web_sm")
+        return spacy.load("en_core_web_sm")
 
 
 nlp = load_nlp()
@@ -322,91 +323,92 @@ if st.button("Screen Applicants"):
     else:
         total_resumes = len(all_files)
         res = []
-        with st.spinner("Analyzing resumes..."):
-            resumes = []
+        resumes = []
 
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-            for i, file in enumerate(all_files):
-                progress = int(((i + 1) / len(all_files)) * 100)
-                progress_bar.progress(progress)
-                status_text.text(f"Processing resume {i + 1}/{len(all_files)}")
+        st.info(f"Processing {total_resumes} resumes...")
 
-                if isinstance(file, str):
-                    file_path = file
-                    f_name = os.path.basename(file)
+        for i, file in enumerate(all_files):
+            progress = int(((i + 1) / len(all_files)) * 100)
+            progress_bar.progress(progress)
+            status_text.text(f"Processing resume {i + 1}/{len(all_files)}")
 
-                else:
-                    file_path = save_uploaded_file(file)
-                    f_name = file.name
+            if isinstance(file, str):
+                file_path = file
+                f_name = os.path.basename(file)
 
-                if f_name.lower().endswith(".pdf"):
-                    txt = pdf_txt(file_path)
-
-                elif f_name.lower().endswith(".docx"):
-                    txt = docx_txt(file_path)
-
-                else:
-                    continue
-
-                if not txt.strip():
-                    continue
-
-                # file cleanup for uploaded files
-                if not isinstance(file, str):
-                    try:
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
-                    except PermissionError:
-                        print(
-                            f"Permission error while deleting {file_path}. It may be in use."
-                        )
-                    except Exception as e:
-                        print(f"Cleanup error for {file_path}: {e}")
-
-                resumes.append({"name": f_name, "text": txt})
-
-            if not resumes:
-                st.warning("No readable resumes found.")
-                st.stop()
-
-            texts = [r["text"] for r in resumes]
-
-            if nlp is not None:
-                docs = list(nlp.pipe(texts, batch_size=50))
             else:
-                # fallback empty docs
-                import spacy
-                docs = [spacy.blank("en")(text) for text in texts]
+                file_path = save_uploaded_file(file)
+                f_name = file.name
 
-            res = []
+            if f_name.lower().endswith(".pdf"):
+                txt = pdf_txt(file_path)
 
-            for resume, doc in zip(resumes, docs):
-                txt = resume["text"]
-                f_name = resume["name"]
+            elif f_name.lower().endswith(".docx"):
+                txt = docx_txt(file_path)
 
-                email, phone, candidate_exp, warning = extract_profile(txt)
-                score, matched_skills = ats_score(
-                    txt, doc, req_sk, candidate_exp, req_exp
-                )
+            else:
+                continue
 
-                res.append(
-                    {
-                        "Resume name": f_name,
-                        "Resume Text": txt,
-                        "Compatibility (%)": score,
-                        "Email": email,
-                        "Phone": phone,
-                        "Experience": f"{candidate_exp} Years",
-                        "Experience Warning": warning,
-                        "Experience Value": candidate_exp,
-                        "Matched Skills": ", ".join(matched_skills),
-                        "Missing Skills": ", ".join(
-                            [sk for sk in req_sk if sk not in matched_skills]
-                        ),
-                    }
-                )
+            if not txt.strip():
+                continue
+
+            # file cleanup for uploaded files
+            if not isinstance(file, str):
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except PermissionError:
+                    print(
+                        f"Permission error while deleting {file_path}. It may be in use."
+                    )
+                except Exception as e:
+                    print(f"Cleanup error for {file_path}: {e}")
+
+            resumes.append({"name": f_name, "text": txt})
+
+        if not resumes:
+            st.warning("No readable resumes found.")
+            st.stop()
+
+        texts = [r["text"] for r in resumes]
+
+        if nlp is not None:
+            docs = list(nlp.pipe(texts, batch_size=50))
+        else:
+            # fallback empty docs
+            blank_nlp = spacy.blank("en")
+            docs = [blank_nlp(text) for text in texts]
+
+        res = []
+
+        for resume, doc in zip(resumes, docs):
+            txt = resume["text"]
+            f_name = resume["name"]
+
+            email, phone, candidate_exp, warning = extract_profile(txt)
+            score, matched_skills = ats_score(
+                txt, doc, req_sk, candidate_exp, req_exp
+            )
+
+            res.append(
+                {
+                    "Resume name": f_name,
+                    "Resume Text": txt[:300],  # limit text for display
+                    "Compatibility (%)": score,
+                    "Email": email,
+                    "Phone": phone,
+                    "Experience": f"{candidate_exp} Years",
+                    "Experience Warning": warning,
+                    "Experience Value": candidate_exp,
+                    "Matched Skills": ", ".join(matched_skills),
+                    "Missing Skills": ", ".join(
+                        [sk for sk in req_sk if sk not in matched_skills]
+                    ),
+                }
+            )
 
         if res:
             df = pd.DataFrame(res)
