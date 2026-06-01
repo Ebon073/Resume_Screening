@@ -54,7 +54,7 @@ def _build_skill_alias_tokens(aliases):
 
 
 def extract_name(txt):
-    
+
     if nlp is None:
         return "Candidate"
 
@@ -371,9 +371,14 @@ if st.button("Screen Applicants"):
                 st.warning("No readable resumes found.")
                 st.stop()
 
-            docs = list(
-                nlp.pipe([r["text"] for r in resumes], batch_size=100, n_process=1)
-            )
+            texts = [r["text"] for r in resumes]
+
+            if nlp is not None:
+                docs = list(nlp.pipe(texts, batch_size=50))
+            else:
+                # fallback empty docs
+                import spacy
+                docs = [spacy.blank("en")(text) for text in texts]
 
             res = []
 
