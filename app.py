@@ -13,7 +13,7 @@ import random
 import json
 from string import Template
 
-with open(r"C:\VSC\ResumeRead-proj\skill.json", "r") as f:
+with open("skill.json", "r") as f:
     skill_aliases = json.load(f)
 
 
