@@ -19,7 +19,10 @@ with open("skill.json", "r") as f:
 
 @st.cache_resource
 def load_nlp():
-    return spacy.load("en_core_web_sm")
+    try:
+        return spacy.load("en_core_web_sm")
+    except Exception:
+        return None
 
 
 nlp = load_nlp()
@@ -51,6 +54,10 @@ def _build_skill_alias_tokens(aliases):
 
 
 def extract_name(txt):
+    
+    if nlp is None:
+        return "Candidate"
+
     doc = nlp(txt)
     for ent in doc.ents:
         if ent.label_ == "PERSON":
